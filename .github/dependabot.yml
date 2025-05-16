@@ -1,0 +1,32 @@
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    commit-message:
+      prefix: deps
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directories:
+      - /
+      - /tools
+    groups:
+      gomod:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    commit-message:
+      prefix: deps
+    schedule:
+      interval: weekly
