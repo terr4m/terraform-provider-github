@@ -1,0 +1,84 @@
+name: New Resource or Data Source
+description: Request a new resource or data source for the provider.
+# title: ""
+labels: ["status/needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for requesting a new resource or data source! Please note that architectural changes and new resources/data sources should be discussed in an issue before opening a PR.
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      description: What type of addition are you requesting?
+      options:
+        - Resource
+        - Data Source
+        - Both Resource and Data Source
+      default: 0
+    validations:
+      required: true
+  - type: input
+    id: name
+    attributes:
+      label: Resource/Data Source Name
+      description: What should the resource or data source be called?
+      placeholder: ex. github_repository, github_organization
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe what this resource or data source should do.
+      placeholder: This resource manages...
+    validations:
+      required: true
+  - type: textarea
+    id: github_api
+    attributes:
+      label: GitHub API Reference
+      description: Please provide links to the GitHub API documentation that this resource/data source would use.
+      placeholder: https://docs.github.com/en/rest/...
+    validations:
+      required: true
+  - type: textarea
+    id: example_config
+    attributes:
+      label: Example TF Configuration
+      description: Provide an example of how this resource or data source would be used in Terraform configuration.
+      render: hcl
+      placeholder: |
+        resource "github_example" "test" {
+          name = "example"
+        }
+
+        data "github_example" "test" {
+          name = "example"
+        }
+    validations:
+      required: true
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use Case
+      description: Describe your use case and why this resource/data source is needed.
+      placeholder: I need this to manage...
+    validations:
+      required: true
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Add any other context, screenshots, or examples about the request here.
+    validations:
+      required: false
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/terr4m/.github/blob/main/CODE_OF_CONDUCT.md).
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
