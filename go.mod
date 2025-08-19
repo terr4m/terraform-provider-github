@@ -1,13 +1,14 @@
 module github.com/terr4m/terraform-provider-github
 
-go 1.24.0
+go 1.25
 
 require (
 	github.com/bored-engineer/github-conditional-http-transport v0.0.0-20250320031546-58985f245f27
 	github.com/bored-engineer/github-conditional-http-transport/bbolt v0.0.0-20250320031546-58985f245f27
 	github.com/bradleyfalzon/ghinstallation/v2 v2.16.0
 	github.com/gofri/go-github-ratelimit/v2 v2.0.2
-	github.com/google/go-github/v72 v72.0.0
+	github.com/google/go-github/v74 v74.0.0
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hashicorp/terraform-plugin-framework v1.15.1
 	github.com/hashicorp/terraform-plugin-framework-timeouts v0.5.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.18.0
@@ -25,6 +26,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/go-github/v72 v72.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-checkpoint v0.5.0 // indirect

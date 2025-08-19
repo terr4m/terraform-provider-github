@@ -12,7 +12,15 @@ import (
 )
 
 func TestAccTeamDataSource(t *testing.T) {
+	if accTestConfigData.AuthType == accAuthTypeUnauthenticated || !accTestConfigData.Features.Organization {
+		t.Skip("Skipping test because the organization testing feature isn't enabled")
+	}
+
 	t.Run("team_exists", func(t *testing.T) {
+		if len(accTestConfigData.Values.TeamSlug) == 0 {
+			t.Skip("Skipping test because the team slug is not set")
+		}
+
 		resource.Test(t, resource.TestCase{
 			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -23,9 +31,9 @@ data "github_team" "test" {
   organization = "%s"
   slug         = "%s"
 }
-`, accTestConfigValues.Owner, accTestConfigValues.TeamSlug),
+`, accTestConfigData.Values.Organization, accTestConfigData.Values.TeamSlug),
 					ConfigStateChecks: []statecheck.StateCheck{
-						statecheck.ExpectKnownValue("data.github_team.test", tfjsonpath.New("name"), knownvalue.StringExact(accTestConfigValues.TeamSlug)),
+						statecheck.ExpectKnownValue("data.github_team.test", tfjsonpath.New("name"), knownvalue.StringExact(accTestConfigData.Values.TeamSlug)),
 					},
 				},
 			},
@@ -43,7 +51,7 @@ data "github_team" "test" {
   organization = "%s"
   slug         = "should-not-exist"
 }
-`, accTestConfigValues.Owner),
+`, accTestConfigData.Values.Organization),
 					ExpectError: regexp.MustCompile("Error: Failed to get team"),
 				},
 			},

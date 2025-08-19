@@ -84,8 +84,12 @@ jobs:
 
       - name: Check diff
         run: |
-          git diff --compact-summary --exit-code || \
-            (echo; echo "Unexpected difference in directories after code generation. Run 'go generate ./...' command and commit."; exit 1)
+          set -euo pipefail
+
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "::error::Unexpected difference in directories after code generation. Run 'go generate ./...' command and commit."
+            exit 1
+          fi
 
   matrix:
     name: Matrix
@@ -149,10 +153,11 @@ jobs:
           TF_ACC: "1"
           TF_ACC_TERRAFORM_VERSION: ${{ matrix.tf_version }}
           GITHUB_TOKEN: ${{ secrets.ACC_GITHUB_TOKEN }}
-          ACC_GITHUB_AUTHENTICATED: "true"
-          ACC_GITHUB_OWNER: stevehipwelltestingorg
-          ACC_GITHUB_OWNER_TYPE: ORGANIZATION
-          ACC_GITHUB_ADVANCED_SECURITY: "false"
+          ACC_GITHUB_AUTH_TYPE: PERSONAL_ACCESS_TOKEN
+          ACC_GITHUB_FEATURE_ORGANIZATION: "true"
+          ACC_GITHUB_VALUE_USERNAME: stevehipwelltesting
+          ACC_GITHUB_VALUE_ORGANIZATION: stevehipwelltestingorg
+          ACC_GITHUB_VALUE_TEAM: test-team
         run: go test -v -timeout 120m -cover ./... -sweep=tf-acc-
 
   check:

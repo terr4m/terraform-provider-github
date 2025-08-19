@@ -7,6 +7,8 @@ linters:
     - copyloopvar
     - durationcheck
     - errcheck
+    - errname
+    - errorlint
     - forcetypeassert
     - godot
     - govet
@@ -15,11 +17,20 @@ linters:
     - misspell
     - nilerr
     - predeclared
+    # - sloglint
     - staticcheck
     - unconvert
     - unparam
     - unused
     - usetesting
+
+  # settings:
+  #   sloglint:
+  #     attr-only: true
+  #     no-global: all
+  #     static-msg: true
+  #     msg-style: capitalized
+  #     # key-naming-case: camel
 
   exclusions:
     generated: lax
@@ -40,6 +51,23 @@ issues:
 formatters:
   enable:
     - gofmt
+    - gofumpt
+    - goimports
+
+  settings:
+    gofmt:
+      simplify: true
+      rewrite-rules:
+        - pattern: interface{}
+          replacement: any
+        - pattern: a[b:len(a)]
+          replacement: a[b:]
+    gofumpt:
+      module-path: github.com/terr4m/terraform-provider-github
+      extra-rules: true
+    goimports:
+      local-prefixes:
+        - github.com/terr4m/terraform-provider-github
 
   exclusions:
     generated: lax

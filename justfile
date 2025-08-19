@@ -10,7 +10,7 @@ tidy:
   go mod tidy
 
 fmt:
-  gofmt -s -w -e .
+  golangci-lint fmt
 
 lint:
   golangci-lint run --timeout 120s

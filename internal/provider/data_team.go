@@ -9,7 +9,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-var _ datasource.DataSource = &TeamDataSource{}
+var (
+	_ datasource.DataSource              = &TeamDataSource{}
+	_ datasource.DataSourceWithConfigure = &TeamDataSource{}
+)
 
 // NewTeamDataSource creates a new team data source.
 func NewTeamDataSource() datasource.DataSource {
@@ -99,13 +102,18 @@ func (d *TeamDataSource) Configure(ctx context.Context, req datasource.Configure
 // Read reads the data source.
 func (d *TeamDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data TeamModel
-
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	t, _, err := d.providerData.Client.Teams.GetTeamBySlug(ctx, data.Organization.ValueString(), data.Slug.ValueString())
+	client, err := d.providerData.ClientCreator.OrganizationClient(ctx, data.Organization.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create organization client", err.Error())
+		return
+	}
+
+	t, _, err := client.Teams.GetTeamBySlug(ctx, data.Organization.ValueString(), data.Slug.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get team.", err.Error())
 		return

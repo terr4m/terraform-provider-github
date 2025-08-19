@@ -9,7 +9,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-var _ datasource.DataSource = &OrganizationDataSource{}
+var (
+	_ datasource.DataSource              = &OrganizationDataSource{}
+	_ datasource.DataSourceWithConfigure = &OrganizationDataSource{}
+)
 
 // NewOrganizationDataSource creates a new organization data source.
 func NewOrganizationDataSource() datasource.DataSource {
@@ -102,13 +105,18 @@ func (d *OrganizationDataSource) Configure(ctx context.Context, req datasource.C
 // Read reads the data source.
 func (d *OrganizationDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data OrganizationModel
-
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	o, _, err := d.providerData.Client.Organizations.Get(ctx, data.Login.ValueString())
+	client, err := d.providerData.ClientCreator.OrganizationClient(ctx, data.Login.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create organization client", err.Error())
+		return
+	}
+
+	o, _, err := client.Organizations.Get(ctx, data.Login.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get organization.", err.Error())
 		return

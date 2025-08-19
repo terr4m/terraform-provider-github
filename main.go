@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+
 	"github.com/terr4m/terraform-provider-github/internal/provider"
 )
 
@@ -27,7 +28,6 @@ func main() {
 	}
 
 	err := providerserver.Serve(context.Background(), provider.New(version, commit), opts)
-
 	if err != nil {
 		log.Fatal(err.Error())
 	}
