@@ -10,11 +10,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v74/github"
 )
 
-var _ datasource.DataSource = &UserDataSource{}
-var _ datasource.DataSourceWithConfigValidators = &UserDataSource{}
+var (
+	_ datasource.DataSource                     = &UserDataSource{}
+	_ datasource.DataSourceWithConfigValidators = &UserDataSource{}
+	_ datasource.DataSourceWithConfigure        = &UserDataSource{}
+)
 
 // NewUserDataSource creates a new user data source.
 func NewUserDataSource() datasource.DataSource {
@@ -109,22 +112,27 @@ func (d *UserDataSource) Configure(ctx context.Context, req datasource.Configure
 // Read reads the data source.
 func (d *UserDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data UserModel
-
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	client, err := d.providerData.ClientCreator.DefaultClient(ctx)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create organization client", err.Error())
+		return
+	}
+
 	var user *github.User
 	if !data.ID.IsNull() {
-		u, _, err := d.providerData.Client.Users.GetByID(ctx, data.ID.ValueInt64())
+		u, _, err := client.Users.GetByID(ctx, data.ID.ValueInt64())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to get user.", err.Error())
 			return
 		}
 		user = u
 	} else if !data.Login.IsNull() {
-		u, _, err := d.providerData.Client.Users.Get(ctx, data.Login.ValueString())
+		u, _, err := client.Users.Get(ctx, data.Login.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to get user.", err.Error())
 			return

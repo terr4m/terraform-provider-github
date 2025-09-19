@@ -8,10 +8,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v74/github"
 )
 
-var _ datasource.DataSource = &TeamMembersDataSource{}
+var (
+	_ datasource.DataSource              = &TeamMembersDataSource{}
+	_ datasource.DataSourceWithConfigure = &TeamMembersDataSource{}
+)
 
 // NewTeamMembersDataSource creates a new team members data source.
 func NewTeamMembersDataSource() datasource.DataSource {
@@ -92,19 +95,24 @@ func (d *TeamMembersDataSource) Configure(ctx context.Context, req datasource.Co
 // Read reads the data source.
 func (d *TeamMembersDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data TeamMembersModel
-
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	mt, _, err := d.providerData.Client.Teams.ListTeamMembersBySlug(ctx, data.Organization.ValueString(), data.Team.ValueString(), &github.TeamListTeamMembersOptions{Role: "maintainer"})
+	client, err := d.providerData.ClientCreator.OrganizationClient(ctx, data.Organization.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create organization client", err.Error())
+		return
+	}
+
+	mt, _, err := client.Teams.ListTeamMembersBySlug(ctx, data.Organization.ValueString(), data.Team.ValueString(), &github.TeamListTeamMembersOptions{Role: "maintainer"})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get team maintainers.", err.Error())
 		return
 	}
 
-	mb, _, err := d.providerData.Client.Teams.ListTeamMembersBySlug(ctx, data.Organization.ValueString(), data.Team.ValueString(), &github.TeamListTeamMembersOptions{Role: "member"})
+	mb, _, err := client.Teams.ListTeamMembersBySlug(ctx, data.Organization.ValueString(), data.Team.ValueString(), &github.TeamListTeamMembersOptions{Role: "member"})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get team members.", err.Error())
 		return

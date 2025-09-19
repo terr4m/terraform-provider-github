@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v74/github"
 )
 
 var (
@@ -92,13 +92,19 @@ func (r *TeamMembershipResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	_, response, _ := r.providerData.Client.Teams.GetTeamMembershipBySlug(ctx, plan.Organization.ValueString(), plan.Team.ValueString(), plan.Username.ValueString())
+	client, err := r.providerData.ClientCreator.OrganizationClient(ctx, plan.Organization.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create organization client", err.Error())
+		return
+	}
+
+	_, response, _ := client.Teams.GetTeamMembershipBySlug(ctx, plan.Organization.ValueString(), plan.Team.ValueString(), plan.Username.ValueString())
 	if response.StatusCode != 404 {
 		resp.Diagnostics.AddError("Team membership already exists.", "can't add the same user to the same team multiple times")
 		return
 	}
 
-	m, _, err := r.providerData.Client.Teams.AddTeamMembershipBySlug(ctx, plan.Organization.ValueString(), plan.Team.ValueString(), plan.Username.ValueString(), &github.TeamAddTeamMembershipOptions{Role: plan.Role.ValueString()})
+	m, _, err := client.Teams.AddTeamMembershipBySlug(ctx, plan.Organization.ValueString(), plan.Team.ValueString(), plan.Username.ValueString(), &github.TeamAddTeamMembershipOptions{Role: plan.Role.ValueString()})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create team membership.", err.Error())
 		return
@@ -122,7 +128,13 @@ func (r *TeamMembershipResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
-	m, _, err := r.providerData.Client.Teams.GetTeamMembershipBySlug(ctx, state.Organization.ValueString(), state.Team.ValueString(), state.Username.ValueString())
+	client, err := r.providerData.ClientCreator.OrganizationClient(ctx, state.Organization.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create organization client", err.Error())
+		return
+	}
+
+	m, _, err := client.Teams.GetTeamMembershipBySlug(ctx, state.Organization.ValueString(), state.Team.ValueString(), state.Username.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get team membership.", err.Error())
 		return
@@ -141,7 +153,13 @@ func (r *TeamMembershipResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	m, _, err := r.providerData.Client.Teams.AddTeamMembershipBySlug(ctx, plan.Organization.ValueString(), plan.Team.ValueString(), plan.Username.ValueString(), &github.TeamAddTeamMembershipOptions{Role: plan.Role.ValueString()})
+	client, err := r.providerData.ClientCreator.OrganizationClient(ctx, plan.Organization.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create organization client", err.Error())
+		return
+	}
+
+	m, _, err := client.Teams.AddTeamMembershipBySlug(ctx, plan.Organization.ValueString(), plan.Team.ValueString(), plan.Username.ValueString(), &github.TeamAddTeamMembershipOptions{Role: plan.Role.ValueString()})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update team membership.", err.Error())
 		return
@@ -165,7 +183,13 @@ func (r *TeamMembershipResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
-	_, err := r.providerData.Client.Teams.RemoveTeamMembershipBySlug(ctx, state.Organization.ValueString(), state.Team.ValueString(), state.Username.ValueString())
+	client, err := r.providerData.ClientCreator.OrganizationClient(ctx, state.Organization.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create organization client", err.Error())
+		return
+	}
+
+	_, err = client.Teams.RemoveTeamMembershipBySlug(ctx, state.Organization.ValueString(), state.Team.ValueString(), state.Username.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete team membership.", err.Error())
 		return

@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v74/github"
 )
 
 var (
@@ -127,7 +127,6 @@ func (r *TeamResource) Configure(ctx context.Context, req resource.ConfigureRequ
 		resp.Diagnostics.AddError("Unexpected resource provider data.", fmt.Sprintf("expected *GitHubProviderData, got: %T", req.ProviderData))
 		return
 	}
-
 	r.providerData = providerData
 }
 
@@ -135,6 +134,12 @@ func (r *TeamResource) Configure(ctx context.Context, req resource.ConfigureRequ
 func (r *TeamResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan TeamModel
 	if resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...); resp.Diagnostics.HasError() {
+		return
+	}
+
+	client, err := r.providerData.ClientCreator.OrganizationClient(ctx, plan.Organization.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create organization client", err.Error())
 		return
 	}
 
@@ -154,21 +159,21 @@ func (r *TeamResource) Create(ctx context.Context, req resource.CreateRequest, r
 		n.ParentTeamID = github.Ptr(plan.Parent.ID.ValueInt64())
 	}
 
-	t, _, err := r.providerData.Client.Teams.CreateTeam(ctx, plan.Organization.ValueString(), n)
+	t, _, err := client.Teams.CreateTeam(ctx, plan.Organization.ValueString(), n)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create team.", err.Error())
 		return
 	}
 
 	if t.GetMembersCount() > 0 {
-		m, _, err := r.providerData.Client.Teams.ListTeamMembersBySlug(ctx, plan.Organization.ValueString(), t.GetSlug(), &github.TeamListTeamMembersOptions{})
+		m, _, err := client.Teams.ListTeamMembersBySlug(ctx, plan.Organization.ValueString(), t.GetSlug(), &github.TeamListTeamMembersOptions{})
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to get team members.", err.Error())
 			return
 		}
 
 		for _, member := range m {
-			_, err := r.providerData.Client.Teams.RemoveTeamMembershipBySlug(ctx, plan.Organization.ValueString(), t.GetSlug(), member.GetLogin())
+			_, err := client.Teams.RemoveTeamMembershipBySlug(ctx, plan.Organization.ValueString(), t.GetSlug(), member.GetLogin())
 			if err != nil {
 				resp.Diagnostics.AddError("Failed to remove team member.", err.Error())
 				return
@@ -204,7 +209,13 @@ func (r *TeamResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	t, _, err := r.providerData.Client.Teams.GetTeamBySlug(ctx, state.Organization.ValueString(), state.Slug.ValueString())
+	client, err := r.providerData.ClientCreator.OrganizationClient(ctx, state.Organization.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create organization client", err.Error())
+		return
+	}
+
+	t, _, err := client.Teams.GetTeamBySlug(ctx, state.Organization.ValueString(), state.Slug.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get team.", err.Error())
 		return
@@ -236,6 +247,12 @@ func (r *TeamResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
+	client, err := r.providerData.ClientCreator.OrganizationClient(ctx, plan.Organization.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create organization client", err.Error())
+		return
+	}
+
 	n := github.NewTeam{
 		Description: github.Ptr(plan.Description.ValueString()),
 		Name:        plan.Name.ValueString(),
@@ -252,7 +269,7 @@ func (r *TeamResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		n.ParentTeamID = github.Ptr(plan.Parent.ID.ValueInt64())
 	}
 
-	t, _, err := r.providerData.Client.Teams.EditTeamBySlug(ctx, plan.Organization.ValueString(), plan.Slug.ValueString(), n, plan.Parent == nil)
+	t, _, err := client.Teams.EditTeamBySlug(ctx, plan.Organization.ValueString(), plan.Slug.ValueString(), n, plan.Parent == nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update team.", err.Error())
 		return
@@ -286,7 +303,13 @@ func (r *TeamResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	_, err := r.providerData.Client.Teams.DeleteTeamBySlug(ctx, state.Organization.ValueString(), state.Slug.ValueString())
+	client, err := r.providerData.ClientCreator.OrganizationClient(ctx, state.Organization.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create organization client", err.Error())
+		return
+	}
+
+	_, err = client.Teams.DeleteTeamBySlug(ctx, state.Organization.ValueString(), state.Slug.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete team.", err.Error())
 		return

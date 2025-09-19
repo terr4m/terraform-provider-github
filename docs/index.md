@@ -12,7 +12,11 @@ The GitHub provider provides a way to manage _GitHub_ resources available via th
 ## Example Usage
 
 ```terraform
-provider "k8s" {
+provider "github" {
+  app_auth = {
+    id               = 123456
+    private_key_file = "path/to/private_key.pem"
+  }
 }
 ```
 
@@ -23,9 +27,8 @@ provider "k8s" {
 
 - `app_auth` (Attributes) GitHub application authentication configuration; this is mutually exclusive with `token`. If `private_key` or `private_key_file` are not provided, the provider will attempt to use the `GITHUB_APP_PRIVATE_KEY` and then `GITHUB_APP_PRIVATE_KEY_FILE` environment variables. (see [below for nested schema](#nestedatt--app_auth))
 - `cache_requests` (Boolean) If `true`, the provider will cache requests to the GitHub API. This can help reduce the number of requests made to the API, but may result in stale data being returned. Defaults to `false`.
-- `owner` (String) The target GitHub organization or user to manage.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
-- `token` (String) A GitHub token to use for authentication; this is mutually exclusive with `app_auth`.
+- `token` (String) A GitHub token to use for authentication; this is mutually exclusive with `app_auth`. If `app_auth` isn;t configured and this isn't set the provider will look for the `GITHUB_TOKEN` environment variable.
 
 <a id="nestedatt--app_auth"></a>
 ### Nested Schema for `app_auth`
@@ -33,7 +36,6 @@ provider "k8s" {
 Required:
 
 - `id` (Number) The GitHub application ID.
-- `installation_id` (Number) The GitHub application installation ID.
 
 Optional:
 

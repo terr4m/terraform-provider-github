@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
@@ -15,14 +16,16 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/google/go-github/v72/github"
+	"github.com/terr4m/terraform-provider-github/internal/ghutil"
 )
 
 // Ensure GitHubProvider satisfies various provider interfaces.
-var _ provider.Provider = &GitHubProvider{}
-var _ provider.ProviderWithConfigValidators = &GitHubProvider{}
-var _ provider.ProviderWithFunctions = &GitHubProvider{}
-var _ provider.ProviderWithEphemeralResources = &GitHubProvider{}
+var (
+	_ provider.Provider                       = &GitHubProvider{}
+	_ provider.ProviderWithConfigValidators   = &GitHubProvider{}
+	_ provider.ProviderWithFunctions          = &GitHubProvider{}
+	_ provider.ProviderWithEphemeralResources = &GitHubProvider{}
+)
 
 // New returns a new provider implementation.
 func New(version, commit string) func() provider.Provider {
@@ -38,7 +41,7 @@ func New(version, commit string) func() provider.Provider {
 type GitHubProviderData struct {
 	provider        *GitHubProvider
 	Model           *GitHubProviderModel
-	Client          *github.Client
+	ClientCreator   ghutil.ClientCreator
 	DefaultTimeouts *Timeouts
 }
 
@@ -52,19 +55,17 @@ type Timeouts struct {
 
 // GitHubProviderModel describes the provider data model.
 type GitHubProviderModel struct {
-	Owner         types.String   `tfsdk:"owner"`
-	Token         types.String   `tfsdk:"token"`
 	AppAuth       *AppAuthModel  `tfsdk:"app_auth"`
 	CacheRequests types.Bool     `tfsdk:"cache_requests"`
 	Timeouts      timeouts.Value `tfsdk:"timeouts"`
+	Token         types.String   `tfsdk:"token"`
 }
 
 // AppAuth describes the application authentication configuration.
 type AppAuthModel struct {
 	ID             types.Int64  `tfsdk:"id"`
-	InstallationID types.Int64  `tfsdk:"installation_id"`
-	PrivateKeyFile types.String `tfsdk:"private_key_file"`
 	PrivateKey     types.String `tfsdk:"private_key"`
+	PrivateKeyFile types.String `tfsdk:"private_key_file"`
 }
 
 // GitHubProvider defines the provider implementation.
@@ -84,20 +85,12 @@ func (p *GitHubProvider) Schema(ctx context.Context, req provider.SchemaRequest,
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "The GitHub provider provides a way to manage _GitHub_ resources available via the REST API using _Terraform_.",
 		Attributes: map[string]schema.Attribute{
-			"owner": schema.StringAttribute{
-				MarkdownDescription: "The target GitHub organization or user to manage.",
-				Optional:            true,
-			},
 			"app_auth": schema.SingleNestedAttribute{
 				MarkdownDescription: "GitHub application authentication configuration; this is mutually exclusive with `token`. If `private_key` or `private_key_file` are not provided, the provider will attempt to use the `GITHUB_APP_PRIVATE_KEY` and then `GITHUB_APP_PRIVATE_KEY_FILE` environment variables.",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"id": schema.Int64Attribute{
 						MarkdownDescription: "The GitHub application ID.",
-						Required:            true,
-					},
-					"installation_id": schema.Int64Attribute{
-						MarkdownDescription: "The GitHub application installation ID.",
 						Required:            true,
 					},
 					"private_key": schema.StringAttribute{
@@ -109,10 +102,6 @@ func (p *GitHubProvider) Schema(ctx context.Context, req provider.SchemaRequest,
 						Optional:            true,
 					},
 				},
-			},
-			"token": schema.StringAttribute{
-				MarkdownDescription: "A GitHub token to use for authentication; this is mutually exclusive with `app_auth`.",
-				Optional:            true,
 			},
 			"cache_requests": schema.BoolAttribute{
 				MarkdownDescription: "If `true`, the provider will cache requests to the GitHub API. This can help reduce the number of requests made to the API, but may result in stale data being returned. Defaults to `false`.",
@@ -128,6 +117,10 @@ func (p *GitHubProvider) Schema(ctx context.Context, req provider.SchemaRequest,
 				Delete:            true,
 				DeleteDescription: "Timeout for resource deletion; defaults to `10m`. This should be a string that can be [parsed as a duration] (https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as `30s` or `2h45m`. Valid time units are `s` (seconds), `m` (minutes), `h` (hours).",
 			}),
+			"token": schema.StringAttribute{
+				MarkdownDescription: "A GitHub token to use for authentication; this is mutually exclusive with `app_auth`. If `app_auth` isn;t configured and this isn't set the provider will look for the `GITHUB_TOKEN` environment variable.",
+				Optional:            true,
+			},
 		},
 	}
 }
@@ -154,20 +147,63 @@ func (p *GitHubProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		}
 	}
 
-	// Load the provider config
 	model := &GitHubProviderModel{}
 	if resp.Diagnostics.Append(req.Config.Get(ctx, model)...); resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Create the GitHub client
-	client, err := getGitHubClient(model)
-	if err != nil {
-		resp.Diagnostics.AddError("failed to create GitHub client", err.Error())
-		return
+	var clientCreator ghutil.ClientCreator
+	cacheRequests := model.CacheRequests.ValueBool()
+	if model.AppAuth != nil {
+		var privateKey []byte
+		appID := model.AppAuth.ID.ValueInt64()
+
+		if !model.AppAuth.PrivateKey.IsNull() {
+			privateKey = []byte(model.AppAuth.PrivateKey.ValueString())
+		} else if !model.AppAuth.PrivateKeyFile.IsNull() {
+			k, err := os.ReadFile(model.AppAuth.PrivateKeyFile.String())
+			if err != nil {
+				resp.Diagnostics.AddError("Failed to read private key file", err.Error())
+				return
+			}
+			privateKey = k
+		} else if v := os.Getenv("GITHUB_APP_PRIVATE_KEY"); len(v) != 0 {
+			privateKey = []byte(v)
+		} else if v := os.Getenv("GITHUB_APP_PRIVATE_KEY_FILE"); len(v) != 0 {
+			k, err := os.ReadFile(v)
+			if err != nil {
+				resp.Diagnostics.AddError("Failed to read private key file", err.Error())
+				return
+			}
+			privateKey = k
+		} else {
+			resp.Diagnostics.AddError("Private key not provided", "no private key was provided for the app auth")
+			return
+		}
+
+		cc, err := ghutil.NewAppClientCreator(appID, privateKey, 10, cacheRequests)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to create GitHub client creator", err.Error())
+			return
+		}
+		clientCreator = cc
+	} else {
+		var token *string
+
+		if !model.Token.IsNull() {
+			token = model.Token.ValueStringPointer()
+		} else if v := os.Getenv("GITHUB_TOKEN"); len(v) != 0 {
+			token = &v
+		}
+
+		cc, err := ghutil.NewClientCreator(token, cacheRequests)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to create GitHub client creator", err.Error())
+			return
+		}
+		clientCreator = cc
 	}
 
-	// Lookup timeouts
 	createTimeout, diags := model.Timeouts.Create(ctx, 10*time.Minute)
 	if resp.Diagnostics.Append(diags...); resp.Diagnostics.HasError() {
 		return
@@ -185,11 +221,10 @@ func (p *GitHubProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 
-	// Configure provider data
 	providerData := &GitHubProviderData{
-		provider: p,
-		Model:    model,
-		Client:   client,
+		provider:      p,
+		Model:         model,
+		ClientCreator: clientCreator,
 		DefaultTimeouts: &Timeouts{
 			Create: createTimeout,
 			Read:   readTimeout,
@@ -205,6 +240,7 @@ func (p *GitHubProvider) Configure(ctx context.Context, req provider.ConfigureRe
 // Resources returns the provider resources.
 func (p *GitHubProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
+		NewOrganizationPropertyResource,
 		NewTeamMembershipResource,
 		NewTeamResource,
 	}
@@ -219,6 +255,7 @@ func (p *GitHubProvider) EphemeralResources(ctx context.Context) []func() epheme
 func (p *GitHubProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewOrganizationDataSource,
+		NewOrganizationPropertiesDataSource,
 		NewTeamDataSource,
 		NewTeamMembersDataSource,
 		NewUserDataSource,

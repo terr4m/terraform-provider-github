@@ -13,8 +13,12 @@ import (
 )
 
 func TestAccTeamResource(t *testing.T) {
+	if accTestConfigData.AuthType == accAuthTypeUnauthenticated || !accTestConfigData.Features.Organization {
+		t.Skip("Skipping test because the organization testing feature isn't enabled")
+	}
+
 	t.Run("create_default", func(t *testing.T) {
-		teamName := fmt.Sprintf("%s%s", accTestConfigValues.ResourcePrefix, acctest.RandomWithPrefix("test"))
+		teamName := fmt.Sprintf("%s%s", accTestConfigData.ResourcePrefix, acctest.RandomWithPrefix("test"))
 
 		resource.Test(t, resource.TestCase{
 			PreCheck:                 func() { testAccPreCheck(t) },
@@ -26,13 +30,13 @@ resource "github_team" "test" {
   organization = "%s"
   name         = "%s"
 }
-`, accTestConfigValues.Owner, teamName),
+`, accTestConfigData.Values.Organization, teamName),
 					ConfigStateChecks: []statecheck.StateCheck{
 						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("description"), knownvalue.StringExact("")),
 						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("id"), knownvalue.NotNull()),
 						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("name"), knownvalue.StringExact(teamName)),
 						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("notifications"), knownvalue.Bool(true)),
-						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("organization"), knownvalue.StringExact(accTestConfigValues.Owner)),
+						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("organization"), knownvalue.StringExact(accTestConfigData.Values.Organization)),
 						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("parent"), knownvalue.Null()),
 						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("privacy"), knownvalue.StringExact("closed")),
 						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("slug"), knownvalue.StringExact(teamName)),
@@ -43,7 +47,7 @@ resource "github_team" "test" {
 	})
 
 	t.Run("create_full", func(t *testing.T) {
-		teamName := fmt.Sprintf("%s%s", accTestConfigValues.ResourcePrefix, acctest.RandomWithPrefix("test"))
+		teamName := fmt.Sprintf("%s%s", accTestConfigData.ResourcePrefix, acctest.RandomWithPrefix("test"))
 		description := "test description"
 		privacy := "secret"
 		notifications := false
@@ -61,13 +65,13 @@ resource "github_team" "test" {
 	privacy      = "%s"
 	notifications = %v
 }
-`, accTestConfigValues.Owner, teamName, description, privacy, notifications),
+`, accTestConfigData.Values.Organization, teamName, description, privacy, notifications),
 					ConfigStateChecks: []statecheck.StateCheck{
 						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("description"), knownvalue.StringExact(description)),
 						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("id"), knownvalue.NotNull()),
 						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("name"), knownvalue.StringExact(teamName)),
 						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("notifications"), knownvalue.Bool(notifications)),
-						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("organization"), knownvalue.StringExact(accTestConfigValues.Owner)),
+						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("organization"), knownvalue.StringExact(accTestConfigData.Values.Organization)),
 						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("parent"), knownvalue.Null()),
 						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("privacy"), knownvalue.StringExact(privacy)),
 						statecheck.ExpectKnownValue("github_team.test", tfjsonpath.New("slug"), knownvalue.StringExact(teamName)),
@@ -88,7 +92,7 @@ resource "github_team" "test" {
   organization = "%s"
   name         = "test-team"
 }
-`, accTestConfigValues.Owner),
+`, accTestConfigData.Values.Organization),
 					ExpectError: regexp.MustCompile("Error: Failed to create team"),
 				},
 			},

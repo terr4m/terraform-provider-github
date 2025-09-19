@@ -12,18 +12,29 @@ import (
 )
 
 func TestAccTeamMembersDataSource(t *testing.T) {
+	if accTestConfigData.AuthType == accAuthTypeUnauthenticated || !accTestConfigData.Features.Organization {
+		t.Skip("Skipping test because the organization testing feature isn't enabled")
+	}
+
 	t.Run("no_members", func(t *testing.T) {
+		teamName := fmt.Sprintf("%s%s", accTestConfigData.ResourcePrefix, acctest.RandomWithPrefix("test"))
+
 		resource.Test(t, resource.TestCase{
 			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
 					Config: fmt.Sprintf(`
-data "github_team_members" "test" {
+resource "github_team" "test" {
   organization = "%s"
-  team         = "%s"
+  name         = "%s"
 }
-`, accTestConfigValues.Owner, accTestConfigValues.TeamSlug),
+
+data "github_team_members" "test" {
+  organization = "%[1]s"
+  team         = github_team.test.slug
+}
+`, accTestConfigData.Values.Organization, teamName),
 					ConfigStateChecks: []statecheck.StateCheck{
 						statecheck.ExpectKnownValue("data.github_team_members.test", tfjsonpath.New("members"), knownvalue.ListSizeExact(0)),
 					},
@@ -33,7 +44,8 @@ data "github_team_members" "test" {
 	})
 
 	t.Run("members", func(t *testing.T) {
-		teamName := fmt.Sprintf("%s%s", accTestConfigValues.ResourcePrefix, acctest.RandomWithPrefix("test"))
+		teamName := fmt.Sprintf("%s%s", accTestConfigData.ResourcePrefix, acctest.RandomWithPrefix("test"))
+
 		resource.Test(t, resource.TestCase{
 			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -57,10 +69,10 @@ data "github_team_members" "test" {
 
   depends_on = [github_team_membership.test]
 }
-`, accTestConfigValues.Owner, teamName, accTestConfigValues.Username),
+`, accTestConfigData.Values.Organization, teamName, accTestConfigData.Values.Username),
 					ConfigStateChecks: []statecheck.StateCheck{
 						statecheck.ExpectKnownValue("data.github_team_members.test", tfjsonpath.New("members"), knownvalue.ListSizeExact(1)),
-						statecheck.ExpectKnownValue("data.github_team_members.test", tfjsonpath.New("members").AtSliceIndex(0).AtMapKey("username"), knownvalue.StringExact(accTestConfigValues.Username)),
+						statecheck.ExpectKnownValue("data.github_team_members.test", tfjsonpath.New("members").AtSliceIndex(0).AtMapKey("username"), knownvalue.StringExact(accTestConfigData.Values.Username)),
 					},
 				},
 			},
