@@ -6,7 +6,9 @@ These instructions define how GitHub Copilot should assist with this Go project.
 
 - **Project Type**: Terraform Provider
 - **Language**: Go
-- **Framework / Libraries**: `terraform/plugin/framework`, `google/go-github`
+- **Framework / Libraries**: `github.com/hashicorp/terraform-plugin-framework`, `github.com/google/go-github`
+
+This project is a Terraform provider to manage GitHub using the REST API.
 
 ### 📁 File Structure
 
@@ -14,6 +16,7 @@ Use this structure as a guide when creating or updating files:
 
 ```text
 internal/
+  ghutil/
   provider/
 go.mod
 go.sum
